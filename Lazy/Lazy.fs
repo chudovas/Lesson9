@@ -1,9 +1,15 @@
 ﻿open System
 open System.Threading
 
+/// <summary>
+/// Интерфейс ILazy<T>, предоставляющий функцию Get() для вычислений
+/// </summary>
 type ILazy<'a> =
     abstract member Get: unit -> 'a
 
+/// <summary>
+/// Класс SingleThreadedLazy<T>, работающий в однопоточном режиме
+/// </summary>
 type SingleThreadedLazy<'a> (supplier : unit -> 'a) =
     let mutable isFirst = true
     let mutable result =  Unchecked.defaultof<'a>
@@ -15,6 +21,9 @@ type SingleThreadedLazy<'a> (supplier : unit -> 'a) =
                 result <- supplier()
             result
    
+/// <summary>
+/// Класс MultiThreadedLazy<T>, работающий в многопоточном режиме
+/// </summary>
 type MultiThreadedLazy<'a> (supplier : unit -> 'a) =
     let mutable isFirst = true
     let mutable result =  Unchecked.defaultof<'a>
@@ -27,11 +36,14 @@ type MultiThreadedLazy<'a> (supplier : unit -> 'a) =
                 lock lockObj (fun() ->
                     if (isFirst)
                     then
-                        isFirst <- false
                         result <- (supplier())
+                        isFirst <- false
                 )
             result   
 
+/// <summary>
+/// Класс MultiThreadedLockFreeLazy<T>, работающий в многопоточном режиме lock-free
+/// </summary>
 type MultiThreadedLockFreeLazy<'a when 'a : not struct and 'a : equality> (supplier : unit -> 'a) =
     let mutable isFirst = true
     let mutable result =  Unchecked.defaultof<'a>
@@ -49,14 +61,29 @@ type MultiThreadedLockFreeLazy<'a when 'a : not struct and 'a : equality> (suppl
 
             Volatile.Write(&isFirst, false)
             result
-        
+      
+/// <summary>
+/// Фабрика классов, реализующий интерфейс ILazy
+/// </summary>
 type LazyFactory =
+    /// <summary>
+    /// Однопоточный ILazy
+    /// </summary>
+    /// <param name="supplier">Функция, предоставляющая вычисления</param>
     static member CreateSingleThreadedLazy (supplier : unit -> 'a) = 
         new SingleThreadedLazy<'a> (supplier) :> ILazy<'a>
 
+    /// <summary>
+    /// Многопоточный ILazy
+    /// </summary>
+    /// <param name="supplier">Функция, предоставляющая вычисления</param>
     static member CreateMultiThreadedLazy (supplier : unit -> 'a) =
         new MultiThreadedLazy<'a> (supplier) :> ILazy<'a>
     
+    /// <summary>
+    /// Многопоточный lock-free ILazy
+    /// </summary>
+    /// <param name="supplier">Функция, предоставляющая вычисления</param>
     static member CreateMultiThreadedLockFreeLazy (supplier : unit -> 'a) =
         new MultiThreadedLockFreeLazy<'a> (supplier) :> ILazy<'a>
 
